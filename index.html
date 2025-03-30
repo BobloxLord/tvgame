@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>2048 Clone with Auto Play (Mouse Only)</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #faf8ef;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    #game-container {
+      display: none;
+      margin: 0 auto;
+      background: #bbada0;
+      padding: 15px;
+      border-radius: 5px;
+      position: relative;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(4, 100px);
+      grid-gap: 15px;
+      margin-bottom: 20px;
+    }
+    .tile {
+      width: 100px;
+      height: 100px;
+      line-height: 100px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #776e65;
+      border-radius: 3px;
+      background: #cdc1b4;
+    }
+    .tile-2   { background: #eee4da; }
+    .tile-4   { background: #ede0c8; }
+    .tile-8   { background: #f2b179; color: #f9f6f2; }
+    .tile-16  { background: #f59563; color: #f9f6f2; }
+    .tile-32  { background: #f67c5f; color: #f9f6f2; }
+    .tile-64  { background: #f65e3b; color: #f9f6f2; }
+    .tile-128 { background: #edcf72; color: #f9f6f2; }
+    .tile-256 { background: #edcc61; color: #f9f6f2; }
+    .tile-512 { background: #edc850; color: #f9f6f2; }
+    .tile-1024 { background: #edc53f; color: #f9f6f2; }
+    .tile-2048 { background: #edc22e; color: #f9f6f2; }
+    #controls {
+      margin-bottom: 10px;
+    }
+    .control-btn {
+      width: 80px;
+      height: 40px;
+      margin: 5px;
+      font-size: 16px;
+      background: #8f7a66;
+      color: #f9f6f2;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .control-btn:hover {
+      background: #9c8a75;
+    }
+    #restart, #auto-play {
+      margin-top: 10px;
+      background: #bbada0;
+      color: #f9f6f2;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 3px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    #restart:hover, #auto-play:hover {
+      background: #c9b7a8;
+    }
+    /* Main menu styles */
+    #main-menu {
+      display: block;
+      margin-top: 100px;
+    }
+    #main-menu button {
+      padding: 15px 30px;
+      font-size: 20px;
+      background: #8f7a66;
+      color: #f9f6f2;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #main-menu button:hover {
+      background: #9c8a75;
+    }
+    /* Game over overlay */
+    #game-over-screen {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(238, 228, 218, 0.9);
+      z-index: 10;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+    }
+    #game-over-screen h1 {
+      font-size: 60px;
+      margin: 0 0 20px 0;
+      color: #776e65;
+    }
+    #game-over-screen button {
+      padding: 15px 30px;
+      font-size: 20px;
+      background: #8f7a66;
+      color: #f9f6f2;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #game-over-screen button:hover {
+      background: #9c8a75;
+    }
+  </style>
+</head>
+<body>
+  <!-- Main Menu -->
+  <div id="main-menu">
+    <h1>2048 Clone</h1>
+    <button id="start-game">Start Game</button>
+  </div>
+
+  <!-- Game Container -->
+  <div id="game-container">
+    <div id="board"></div>
+    <div id="controls">
+      <button class="control-btn" id="up">Up</button><br>
+      <button class="control-btn" id="left">Left</button>
+      <button class="control-btn" id="down">Down</button>
+      <button class="control-btn" id="right">Right</button>
+    </div>
+    <button id="restart">Restart</button>
+    <button id="auto-play">Auto Play</button>
+  </div>
+
+  <!-- Game Over Overlay -->
+  <div id="game-over-screen">
+    <h1>Game Over</h1>
+    <button id="restart-game">Restart Game</button>
+  </div>
+
+  <script>
+    const SIZE = 4;
+    let board;
+    let autoPlayInterval = null;
+
+    // Initialize board and add two random tiles
+    function initBoard() {
+      board = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+      addNewTile();
+      addNewTile();
+      renderBoard();
+    }
+
+    // Add a new tile (2 or 4) at a random empty cell
+    function addNewTile() {
+      const emptyCells = [];
+      for (let i = 0; i < SIZE; i++) {
+        for (let j = 0; j < SIZE; j++) {
+          if (board[i][j] === 0) {
+            emptyCells.push({ i, j });
+          }
+        }
+      }
+      if (emptyCells.length === 0) return;
+      const { i, j } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+      board[i][j] = Math.random() < 0.1 ? 4 : 2;
+    }
+
+    // Render board to HTML
+    function renderBoard() {
+      const boardDiv = document.getElementById('board');
+      boardDiv.innerHTML = "";
+      for (let i = 0; i < SIZE; i++) {
+        for (let j = 0; j < SIZE; j++) {
+          const tileValue = board[i][j];
+          const tileDiv = document.createElement('div');
+          tileDiv.classList.add('tile');
+          if (tileValue !== 0) {
+            tileDiv.textContent = tileValue;
+            tileDiv.classList.add('tile-' + tileValue);
+          }
+          boardDiv.appendChild(tileDiv);
+        }
+      }
+    }
+
+    // Slide and combine a row/column array
+    function slideAndCombine(arr) {
+      let filtered = arr.filter(val => val !== 0);
+      for (let i = 0; i < filtered.length - 1; i++) {
+        if (filtered[i] === filtered[i + 1]) {
+          filtered[i] *= 2;
+          filtered[i + 1] = 0;
+          i++;
+        }
+      }
+      filtered = filtered.filter(val => val !== 0);
+      while (filtered.length < SIZE) {
+        filtered.push(0);
+      }
+      return filtered;
+    }
+
+    // In-place move functions – return true if board changed
+    function moveLeft(boardState) {
+      let changed = false;
+      for (let i = 0; i < SIZE; i++) {
+        const newRow = slideAndCombine(boardState[i]);
+        if (newRow.toString() !== boardState[i].toString()) {
+          boardState[i] = newRow;
+          changed = true;
+        }
+      }
+      return changed;
+    }
+
+    function moveRight(boardState) {
+      let changed = false;
+      for (let i = 0; i < SIZE; i++) {
+        const reversed = boardState[i].slice().reverse();
+        const newRow = slideAndCombine(reversed).reverse();
+        if (newRow.toString() !== boardState[i].toString()) {
+          boardState[i] = newRow;
+          changed = true;
+        }
+      }
+      return changed;
+    }
+
+    function moveUp(boardState) {
+      let changed = false;
+      for (let j = 0; j < SIZE; j++) {
+        const col = [];
+        for (let i = 0; i < SIZE; i++) {
+          col.push(boardState[i][j]);
+        }
+        const newCol = slideAndCombine(col);
+        for (let i = 0; i < SIZE; i++) {
+          if (boardState[i][j] !== newCol[i]) {
+            boardState[i][j] = newCol[i];
+            changed = true;
+          }
+        }
+      }
+      return changed;
+    }
+
+    function moveDown(boardState) {
+      let changed = false;
+      for (let j = 0; j < SIZE; j++) {
+        const col = [];
+        for (let i = 0; i < SIZE; i++) {
+          col.push(boardState[i][j]);
+        }
+        const newCol = slideAndCombine(col.reverse()).reverse();
+        for (let i = 0; i < SIZE; i++) {
+          if (boardState[i][j] !== newCol[i]) {
+            boardState[i][j] = newCol[i];
+            changed = true;
+          }
+        }
+      }
+      return changed;
+    }
+
+    // Check if there are no moves left
+    function isGameOver() {
+      for (let i = 0; i < SIZE; i++) {
+        for (let j = 0; j < SIZE; j++) {
+          if (board[i][j] === 0) return false;
+        }
+      }
+      for (let i = 0; i < SIZE; i++) {
+        for (let j = 0; j < SIZE - 1; j++) {
+          if (board[i][j] === board[i][j + 1]) return false;
+        }
+      }
+      for (let j = 0; j < SIZE; j++) {
+        for (let i = 0; i < SIZE - 1; i++) {
+          if (board[i][j] === board[i + 1][j]) return false;
+        }
+      }
+      return true;
+    }
+
+    // Clones a board state (2D array)
+    function cloneBoard(boardState) {
+      return boardState.map(row => row.slice());
+    }
+
+    // Simulation helper: simulate a move on a cloned board.
+    // Returns an object { board: newBoard, changed: bool }.
+    function simulateMove(moveFunc) {
+      const simBoard = cloneBoard(board);
+      const changed = moveFunc(simBoard);
+      return { board: simBoard, changed };
+    }
+
+    // Heuristic evaluation function.
+    // Here we use a simple heuristic: the more empty cells the better.
+    function evaluateBoard(simBoard) {
+      let empty = 0;
+      for (let i = 0; i < SIZE; i++) {
+        for (let j = 0; j < SIZE; j++) {
+          if (simBoard[i][j] === 0) empty++;
+        }
+      }
+      return empty;
+    }
+
+    // Auto play function: try each move and choose the one with highest heuristic.
+    function autoPlayStep() {
+      if (isGameOver()) {
+        stopAutoPlay();
+        setTimeout(showGameOver, 200);
+        return;
+      }
+      const moves = [
+        { name: 'left', func: moveLeft },
+        { name: 'right', func: moveRight },
+        { name: 'up', func: moveUp },
+        { name: 'down', func: moveDown }
+      ];
+      let bestMove = null;
+      let bestScore = -1;
+      // Try each move on a simulation of the board.
+      moves.forEach(move => {
+        const sim = simulateMove(move.func);
+        if (sim.changed) {
+          const score = evaluateBoard(sim.board);
+          if (score > bestScore) {
+            bestScore = score;
+            bestMove = move.func;
+          }
+        }
+      });
+      // If a valid move was found, execute it.
+      if (bestMove && bestMove(board)) {
+        addNewTile();
+        renderBoard();
+      }
+    }
+
+    // Start and stop auto play
+    function startAutoPlay() {
+      if (autoPlayInterval) return;
+      autoPlayInterval = setInterval(autoPlayStep, 300);
+    }
+
+    function stopAutoPlay() {
+      clearInterval(autoPlayInterval);
+      autoPlayInterval = null;
+    }
+
+    // Process a manual move (via button) and stop auto play if running.
+    function handleMove(moveFunc) {
+      stopAutoPlay();
+      if (moveFunc(board)) {
+        addNewTile();
+        renderBoard();
+        if (isGameOver()) {
+          setTimeout(showGameOver, 200);
+        }
+      }
+    }
+
+    // Show game over overlay
+    function showGameOver() {
+      document.getElementById('game-over-screen').style.display = "flex";
+    }
+
+    // Hide game over overlay and reset game
+    function restartGame() {
+      document.getElementById('game-over-screen').style.display = "none";
+      stopAutoPlay();
+      initBoard();
+    }
+
+    // Event listeners for manual control buttons
+    document.getElementById("left").addEventListener("click", () => handleMove(moveLeft));
+    document.getElementById("right").addEventListener("click", () => handleMove(moveRight));
+    document.getElementById("up").addEventListener("click", () => handleMove(moveUp));
+    document.getElementById("down").addEventListener("click", () => handleMove(moveDown));
+    document.getElementById("restart").addEventListener("click", restartGame);
+    document.getElementById("auto-play").addEventListener("click", startAutoPlay);
+    document.getElementById("restart-game").addEventListener("click", restartGame);
+
+    // Main menu start button event
+    document.getElementById("start-game").addEventListener("click", () => {
+      document.getElementById("main-menu").style.display = "none";
+      document.getElementById("game-container").style.display = "block";
+      initBoard();
+    });
+  </script>
+</body>
+</html>
